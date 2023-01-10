@@ -1,0 +1,192 @@
+---
+title: "Final Project"
+author: "Yuxuan Liu"
+date: "`r format(Sys.time(), '%d ,%m, %Y')`"
+output:
+  pdf_document:
+    latex_engine: xelatex
+---
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE,
+                      fig.align = 'center')
+library(tidyverse)
+library(ggplot2)
+library(caret) 
+library(rpart)
+library(rpart.plot)
+library(patchwork)
+library(WDI)
+library(countrycode)
+library(data.table)
+player <- read.csv("C:/Users/lyx48/Downloads/players_22.csv")
+```
+
+## 1. Clean the data and set the function we need
+
+```{r q1}
+player <- player[complete.cases(player[,c('shooting','skill_curve','value_eur','movement_acceleration','power_shot_power','league_level','body_type','preferred_foot','club_name')]), ] 
+player_clean <- player %>%
+  select(-player_url,-sofifa_id,player_tags,-player_traits,-player_face_url,-club_loaned_from,-club_jersey_number,-club_contract_valid_until,-nationality_id,-long_name) %>%
+  mutate(iso3 = countrycode(nationality_name, "country.name", "iso3c",
+                            custom_match = c("Korea, North" = "PRK"))) %>%
+  mutate(origin_country = countrycode(iso3, "iso3c", "country.name"),
+         origin_region = countrycode(iso3, "iso3c", "region"),
+         origin_continent = countrycode(iso3, "iso3c", "continent")) %>%
+  group_by(shooting)
+  
+rmse = function(actual, predicted) {
+  sqrt(mean((actual - predicted) ^ 2))
+}
+calc_rmse = function(actual, predicted) {
+  sqrt(mean((actual - predicted) ^ 2))
+}
+get_rmse = function(model, data, response) {
+  rmse(actual = subset(data, select = response, drop = TRUE),
+       predicted = predict(model, data))
+}
+get_complexity = function(model) {
+  length(coef(model)) - 1
+}
+get_mse = function(truth, estimate) {
+  mean((estimate - truth) ^ 2)
+}
+get_bias = function(estimate, truth) {
+  mean(estimate) - truth
+}
+get_bias = function(estimate, truth) {
+  mean(estimate) - truth
+}
+
+```
+
+## 2. Features
+
+```{r features plot}
+Eu <- player_clean[player_clean$origin_continent=="Europe",]%>%
+  filter(shooting>=mean(shooting))
+Af <- player_clean[player_clean$origin_continent=="Africa",]%>%
+  filter(shooting>=mean(shooting))
+As <- player_clean[player_clean$origin_continent=="Asia",]%>%
+  filter(shooting>=mean(shooting))
+Am <- player_clean[player_clean$origin_continent=="Americas",]%>%
+  filter(shooting>=mean(shooting))
+
+plot1 <- ggplot(Eu,aes(x=body_type,y=shooting))+geom_col(aes(color= body_type,fill =body_type))+xlab("Player Body Type")+ylab("The Sum of Ability on Shooting than mean level")+theme_bw()+theme(axis.text.x = element_text(angle = 90, hjust =1))+geom_text(aes( label = shooting), vjust =  "top",check_overlap = TRUE)+ggtitle(" The body type relationship with shooting ",subtitle = "Europe Player")
+
+plot1_AF <- ggplot(Af,aes(x=body_type,y=shooting))+geom_col(aes(color= body_type,fill =body_type))+xlab("Player Body Type")+ylab("The Sum of Ability on Shooting than mean level")+theme_bw()+theme(axis.text.x = element_text(angle = 90, hjust =1))+geom_text(aes( label = shooting), vjust =  "top",check_overlap = TRUE)+ggtitle(" The body type relationship with shooting ",subtitle = "Africa Player")
+
+
+plot1_AS <- ggplot(As,aes(x=body_type,y=shooting))+geom_col(aes(color= body_type,fill =body_type))+xlab("Player Body Type")+ylab("The Sum of Ability on Shooting than mean level")+theme_bw()+theme(axis.text.x = element_text(angle = 90, hjust =1))+geom_text(aes( label = shooting), vjust =  "top",check_overlap = TRUE)+ggtitle(" The body type relationship with shooting ",subtitle = "Asia Player")
+
+plot1_AM <- ggplot(Am,aes(x=body_type,y=shooting))+geom_col(aes(color= body_type,fill =body_type))+xlab("Player Body Type")+ylab("The Sum of Ability on Shooting than mean level")+theme_bw()+theme(axis.text.x = element_text(angle = 90, hjust =1))+geom_text(aes( label = shooting), vjust =  "top",check_overlap = TRUE)+ggtitle(" The body type raltionship with shooting ",subtitle = "America Player")
+
+
+plot2 <- ggplot(Eu,aes(x=club_position,y=shooting))+geom_col(aes(color= work_rate,fill =work_rate))+theme(axis.text.x = element_text(angle = 90, hjust = 1))+xlab("Work rate")+ylab("The Sum of Ability on Shooting than mean level")+theme_bw()+theme(axis.text.x = element_text(angle = 90, hjust =1))+theme(legend.key.size = unit(2, 'mm'))+theme(legend.position="bottom")+ggtitle("Club Position with shooting abiliity and work rate",subtitle = "Europe Player")+guides(fill=guide_legend(nrow=2,byrow=TRUE))
+
+plot2_AF <- ggplot(Af,aes(x=club_position,y=shooting))+geom_col(aes(color= work_rate,fill =work_rate))+theme(axis.text.x = element_text(angle = 90, hjust = 1))+xlab("Work rate")+ylab("The Sum of Ability on Shooting than mean level")+theme_bw()+theme(axis.text.x = element_text(angle = 90, hjust =1))+theme(legend.key.size = unit(2, 'mm'))+theme(legend.position="bottom")+ggtitle("Club Position with shooting abiliity and work rate",subtitle = "Africa Player")+guides(fill=guide_legend(nrow=2,byrow=TRUE))
+
+plot2_AS <- ggplot(As,aes(x=club_position,y=shooting))+geom_col(aes(color= work_rate,fill =work_rate))+theme(axis.text.x = element_text(angle = 90, hjust = 1))+xlab("Work rate")+ylab("The Sum of Ability on Shooting than mean level")+theme_bw()+theme(axis.text.x = element_text(angle = 90, hjust =1))+theme(legend.key.size = unit(2, 'mm'))+theme(legend.position="bottom")+ggtitle("Club Position with shooting abiliity and work rate",subtitle = "Asia Player")+guides(fill=guide_legend(nrow=2,byrow=TRUE))
+
+plot2_AM <- ggplot(Am,aes(x=club_position,y=shooting))+geom_col(aes(color= work_rate,fill =work_rate))+theme(axis.text.x = element_text(angle = 90, hjust = 1))+xlab("Work rate")+ylab("The Sum of Ability on Shooting than mean level")+theme_bw()+theme(axis.text.x = element_text(angle = 90, hjust =1))+theme(legend.key.size = unit(2, 'mm'))+theme(legend.position="bottom")+ggtitle("Club Position with shooting abiliity and work rate",subtitle = "America Player")+guides(fill=guide_legend(nrow=2,byrow=TRUE))
+
+plot3 <- ggplot(Eu,aes(x=nationality_name,y=shooting))+geom_col(aes(color= nationality_name,fill =nationality_name))+xlab("Nation Name")+ylab("The number of Ability on Shooting than mean level")+theme_bw()+theme(axis.text.x = element_text(angle = 90, hjust =1))+theme(legend.key.size = unit(2, 'mm'))+theme(legend.position="bottom")+ggtitle("The High shooting ability players's homecountry",subtitle = "Europe Player")+guides(fill=guide_legend(nrow=2,byrow=TRUE))
+
+plot3_AF <- ggplot(Af,aes(x=nationality_name,y=shooting))+geom_col(aes(color= nationality_name,fill =nationality_name))+xlab("Nation Name")+ylab("The number of Ability on Shooting than mean level")+theme_bw()+theme(axis.text.x = element_text(angle = 90, hjust =1))+theme(legend.key.size = unit(2, 'mm'))+theme(legend.position="bottom")+ggtitle("The High shooting ability players's homecountry",subtitle = "Afirca Player")
+
+plot3_AS <- ggplot(As,aes(x=nationality_name,y=shooting))+geom_col(aes(color= nationality_name,fill =nationality_name))+xlab("Nation Name")+ylab("The number of Ability on Shooting than mean level")+theme_bw()+theme(axis.text.x = element_text(angle = 90, hjust =1))+theme(legend.key.size = unit(2, 'mm'))+theme(legend.position="bottom")+ggtitle("The High shooting ability players's homecountry",subtitle = "Asia Player")
+
+plot3_AM <- ggplot(Am,aes(x=nationality_name,y=shooting))+geom_col(aes(color= nationality_name,fill =nationality_name))+xlab("Nation Name")+ylab("The number of Ability on Shooting than mean level")+theme_bw()+theme(axis.text.x = element_text(angle = 90, hjust =1))+theme(legend.key.size = unit(2, 'mm'))+theme(legend.position="bottom")+ggtitle("The High shooting ability players's homecountry",subtitle = "America Player")
+
+plot1
+plot1_AF
+plot1_AS
+plot1_AM
+
+ plot2
+plot2_AF
+plot2_AS
+
+plot3
+plot3_AF
+plot3_AS
+plot3_AM
+```
+
+
+
+## 3. Split the data
+
+```{r Split Data}
+set.seed(100)
+player_idx = sample(nrow(player_clean), size = 0.8 * nrow(player_clean))
+player_trn = player_clean[player_idx, ]
+player_tst = player_clean[-player_idx, ]
+```
+
+## 4. BUild Regression
+
+```{r BuildModel}
+model1 <- lm(shooting~age,data = player_trn)
+summary(model1)
+model2 <- lm(shooting~age+skill_curve,data = player_trn)
+summary(model2)
+model3 <- lm(shooting~age+skill_curve+movement_acceleration,data = player_trn)
+summary(model3)
+model4 <- lm(shooting~age+skill_curve+movement_acceleration+power_shot_power,data = player_trn)
+summary(model4)
+model5 <- lm(shooting~age+skill_curve+movement_acceleration+power_shot_power+league_level,data = player_trn)
+summary(model5)
+model6 <- lm(shooting~age+skill_curve+movement_acceleration+power_shot_power+league_level+as.factor(body_type),data = player_trn)
+summary(model6)
+model7 <- lm(shooting~age+skill_curve+movement_acceleration+power_shot_power+league_level+as.factor(body_type)+goalkeeping_diving,data = player_trn)
+summary(model7)
+model8 <- lm(shooting~age+skill_curve+movement_acceleration+power_shot_power+league_level+as.factor(body_type)+goalkeeping_diving+as.factor(preferred_foot),data = player_trn)
+summary(model8)
+#model9 <- rpart(shooting~age+skill_curve+movement_acceleration+power_shot_power+league_level+as.factor(body_type)+skill_moves+as.factor(preferred_foot),data = player_trn,cp=0.001)
+#rpart.plot(model9)
+#summary(model9)
+```
+
+## 5. RMSE and RMSE plot
+
+```{r RMSE}
+rmse1_test <- get_rmse(model1,player_tst,response = "shooting")
+rmse2_test <- get_rmse(model2,player_tst,response = "shooting")
+rmse3_test <- get_rmse(model3,player_tst,response = "shooting")
+rmse4_test <- get_rmse(model4,player_tst,response = "shooting")
+rmse5_test <- get_rmse(model5,player_tst,response = "shooting")
+rmse6_test <- get_rmse(model6,player_tst,response = "shooting")
+rmse7_test <- get_rmse(model7,player_tst,response = "shooting")
+rmse8_test <- get_rmse(model8,player_tst,response = "shooting")
+
+rmse1 <- calc_rmse(player_trn$shooting,predict(model1,player_trn))
+rmse2 <- calc_rmse(player_trn$shooting,predict(model2,player_trn))
+rmse3 <- calc_rmse(player_trn$shooting,predict(model3,player_trn))
+rmse4 <- calc_rmse(player_trn$shooting,predict(model4,player_trn))
+rmse5 <- calc_rmse(player_trn$shooting,predict(model5,player_trn))
+rmse6 <- calc_rmse(player_trn$shooting,predict(model6,player_trn))
+rmse7 <- calc_rmse(player_trn$shooting,predict(model7,player_trn))
+rmse8 <- calc_rmse(player_trn$shooting,predict(model8,player_trn))
+
+cmplx1 <- get_complexity(model1)
+cmplx2 <- get_complexity(model2)
+cmplx3 <- get_complexity(model3)
+cmplx4 <- get_complexity(model4)
+cmplx5 <- get_complexity(model5)
+cmplx6 <- get_complexity(model6)
+cmplx7 <- get_complexity(model7)
+cmplx8 <- get_complexity(model8)
+
+tr <- c(rmse1,rmse2,rmse3,rmse4,rmse5,rmse6,rmse7,rmse8)
+tst <- c(rmse1_test,rmse2_test,rmse3_test,rmse4_test,rmse5_test,rmse6_test,rmse7_test,rmse8_test)
+com <- c(cmplx1,cmplx2,cmplx3,cmplx4,cmplx5,cmplx6,cmplx7,cmplx8)
+
+train <- map2_dfr(com,tr,~ tibble(Complexity = .x, RMSE = .y))
+test <- map2_dfr(com,tst,~ tibble(Complexity = .x, RMSE = .y))
+
+ptr <- ggplot(train)+geom_line(aes(x=Complexity,y=RMSE),colour ="Blue")
+pts <- ggplot(test)+geom_line(aes(x=Complexity,y=RMSE),colour ="Orange")
+
+ptr+ggtitle("RMSE with Complexity",subtitle = "Train Data")+pts+ggtitle("RMSE with Complexity",subtitle = "Test Data")
+```

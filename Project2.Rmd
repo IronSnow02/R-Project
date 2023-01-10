@@ -1,0 +1,99 @@
+---
+title: "Project2"
+author: "Yuxuan Liu"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  pdf_document:
+      pandoc_args: ["--extract-media", "."]
+---
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE,
+                      fig.align = 'center')
+library(tidyverse)
+library(skimr)
+library(data.table)
+library(ggplot2)
+library(ggrepel)
+library(countrycode)
+library(lubridate)
+library(WDI)
+options(scipen = 999)
+refugees_raw <- read_csv("E:/Rworks/refugee_status.csv", na = c("-", "X", "D"))
+```
+
+## 1. Text of the question copied here
+
+Write your answer here, before your code, or after your code. Just make sure your headers are correct.
+
+```{r q1}
+non_countries <- c("Africa", "Asia", "Europe", "North America", "Oceania",
+                   "South America", "Unknown", "Other", "Total")
+refugees_clean <- refugees_raw %>%
+  # Make this column name easier to work with
+  rename(origin_country = `Continent/Country of Nationality`) %>%
+  # Get rid of non-countries
+  filter(!(origin_country %in% non_countries)) %>%
+  # Convert country names to ISO3 codes
+  mutate(iso3 = countrycode(origin_country, "country.name", "iso3c",
+                            custom_match = c("Korea, North" = "PRK"))) %>%
+  # Convert ISO3 codes to country names, regions, and continents
+  mutate(origin_country = countrycode(iso3, "iso3c", "country.name"),
+         origin_region = countrycode(iso3, "iso3c", "region"),
+         origin_continent = countrycode(iso3, "iso3c", "continent")) %>%
+  # Make this data tidy
+  gather(year, number, -origin_country, -iso3, -origin_region, -origin_continent) %>%
+  # Make sure the year column is numeric + make an actual date column for years
+  mutate(year = as.numeric(year),
+         year_date = ymd(paste0(year, "-01-01")))
+refugees_countries_cumulative <- refugees_clean %>%
+  arrange(year_date) %>%
+  group_by(origin_country) %>%
+  mutate(cumulative_total = cumsum(number))
+
+```
+
+The rest of your answer to the first question.
+
+\newpage
+## 2. Text of Question 2 Copied Here
+
+### a. Subquestion text here
+
+```{r q2}
+refugees_clean <- refugees_raw %>%
+  rename(origin_country = `Continent/Country of Nationality`) %>%
+  dplyr::filter(!(origin_country %in% non_countries)) %>%
+  mutate(iso2 = countrycode(origin_country, "country.name", "iso2c",
+                            custom_match = c("Korea, North" = "KP"))) %>%
+  mutate(origin_country = countrycode(iso2, "iso2c", "country.name"),
+         origin_region = countrycode(iso2, "iso2c", "region"),
+         origin_continent = countrycode(iso2, "iso2c", "continent")) %>%
+  gather(year, number, -origin_country, -iso2, -origin_region, -origin_continent) %>%
+  mutate(year = as.numeric(year),
+         year_date = ymd(paste0(year, "-01-01")),
+         iso2c = iso2)
+library(WDI)
+myData = WDI(country = refugees_clean$iso2, indicator = 'SP.POP.TOTL', start = 2006, end = 2015)  %>%
+      dplyr::select(-country)
+refugees_clean_merged = left_join(refugees_clean, myData, by = c('iso2c','year')) 
+```
+
+```{r code2}
+newdata = merge(myData,refugees_clean,by=c("iso2c","year"))
+newdata2 <- refugees_clean_merged %>%
+  mutate(percent = (number/SP.POP.TOTL))
+newdata3  <-  newdata2[newdata2$origin_continent=="Europe",]
+newdata4 <- newdata3[!(newdata3$origin_country=="Serbia" | newdata3$origin_country=="Bosnia & Herzegovina"| newdata3$origin_country=="Latvia"),]
+```
+
+
+```{r plot2}
+plot1<- ggplot(newdata4, aes(y=percent,x=year)) + geom_line(aes(color = origin_country))+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) + scale_x_continuous(labels = as.character(newdata4$year),breaks = newdata4$year,minor_breaks = seq(1, 10, 1))+xlab("Years")+ylab("Percentage of refugee in total population")+ggtitle("The Percentage of refugees in Europe from 2006 to 2015",subtitle = "does not include countries with NA values")+geom_point() +scale_y_continuous(labels = scales::percent_format(accuracy = 0.00001),minor_breaks = seq(1, 10, 1))+guides(color = guide_legend(title = "Counrty Names"))+ theme(legend.key.size = unit(1, 'cm'),legend.key.height = unit(1, 'cm'),legend.key.width = unit(1, 'cm'),legend.title = element_text(size=14),legend.text = element_text(size=10))+geom_text(x=2010,y=0.0002,label="Moldova-Due to the low number of \n opportunities for post-secondary graduates in sectors \n aside from farming, many are looking \n for employment outside the country.",size=3)+geom_vline(xintercept = 2007, linetype="dashed", color="Yellow", size=2)+scale_color_manual(values=c( "#009E73", "#9999CC","#D55E00", "#0072B2"))
+
+plot1
+```
+```{r save}
+ggsave("finalplotdraft3.pdf",plot1)
+newdata5 <-  newdata3[!(newdata3$origin_country=="Serbia" | newdata3$origin_country=="Bosnia & Herzegovina"| newdata3$origin_country=="Latvia"| newdata3$origin_country=="Haiti"| newdata3$origin_country=="Mauritania"| newdata3$origin_country=="Jordan"| newdata3$origin_country=="Egypt"| newdata3$origin_country=="Nepal"| newdata3$origin_country=="Kuwait"| newdata3$origin_country=="South Sudan"| newdata3$origin_country=="Indonesia"| newdata3$origin_country=="Kenya"| newdata3$origin_country=="Sri Lanka"| newdata3$origin_country=="Zimbabwe"| newdata3$origin_country=="Angola"| newdata3$origin_country=="Cameroon"| newdata3$origin_country=="Equatorial Guinea"| newdata3$origin_country=="Yemen"| newdata3$origin_country=="Nigeria"| newdata3$origin_country=="Laos"| newdata3$origin_country=="Togo"	| newdata3$origin_country=="Nigeria"),]
+```

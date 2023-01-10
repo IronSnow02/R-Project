@@ -1,0 +1,131 @@
+---
+title: "Lab No. X"
+author: "Your Name Here"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  pdf_document:
+      pandoc_args: ["--extract-media", "."]
+---
+## code of starter and rename the location_type in order to make a better visualization
+```{r setup, echo=FALSE}
+knitr::opts_chunk$set(fig.align = 'center')
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(ggrepel)
+rats_raw <- read_csv("E:/Rworks/Rat_Sightings.csv", na = c("", "NA", "N/A"))
+rats_clean <- rats_raw %>%
+  rename(created_date = `Created Date`,
+         location_type = `Location Type`,
+         borough = `Borough`,
+         commuunity_board=`Community Board`) %>%
+  group_by(borough)%>%
+  mutate(created_date = mdy_hms(created_date)) %>%
+  mutate(sighting_year = year(created_date),
+         sighting_month = month(created_date),
+         sighting_day = day(created_date),
+         sighting_weekday = wday(created_date, label = TRUE, abbr = FALSE),
+         lc_tp=location_type) %>%# the code create a new varibale "lc_tp" that is same as location_type
+  filter(borough != "Unspecified")
+# the code write by myself,and generate the value in lc-tp,is to make the people more easier to read this thing
+rats_clean <- rats_clean%>%
+  filter(!is.na(lc_tp) & !is.na(location_type))
+rats_clean$lc_tp[rats_clean$lc_tp == "3+ Family Apt. Building"] <- "Family Building"
+rats_clean$lc_tp[rats_clean$lc_tp =="3+ Family Mixed Use Building"]<- "Family Building"
+rats_clean$lc_tp[rats_clean$lc_tp =="1-2 Family Mixed Use Building"]<- "Family Building"
+rats_clean$lc_tp[rats_clean$lc_tp =="3+ Family Apartment Building"]<- "Family Building"
+rats_clean$lc_tp[rats_clean$lc_tp =="1-3 Family Mixed Use Building"]<- "Family Building"
+rats_clean$lc_tp[rats_clean$lc_tp =="Vacant Lot"]<-"Vacant"
+rats_clean$lc_tp[rats_clean$lc_tp =="Vacant Building"]<-"Vacant"
+rats_clean$lc_tp[rats_clean$lc_tp =="Vacant Lot/Property"]<-"Vacant"
+rats_clean$lc_tp[rats_clean$lc_tp =="1-2 Family Dwelling"] <- "Dwelling"
+rats_clean$lc_tp[rats_clean$lc_tp =="1-3 Family Dwelling"] <- "Dwelling"
+rats_clean$lc_tp[rats_clean$lc_tp =="Parking Lot/Garage"] <-"Infrastrucure"
+rats_clean$lc_tp[rats_clean$lc_tp =="Public Garden"] <-"Infrastrucure"
+rats_clean$lc_tp[rats_clean$lc_tp =="Public Garden"] <-"Infrastrucure"
+rats_clean$lc_tp[rats_clean$lc_tp =="School/Pre-School"] <-"Infrastrucure"
+rats_clean$lc_tp[rats_clean$lc_tp =="School"] <-"Infrastrucure"
+rats_clean$lc_tp[rats_clean$lc_tp =="Public Stairs"] <-"Infrastrucure"
+rats_clean$lc_tp[rats_clean$lc_tp =="Restaurant/Bar/Deli/Bakery"] <-"Restaurant"
+rats_clean$lc_tp[rats_clean$lc_tp =="Restaurant"] <-"Restaurant"
+rats_clean$lc_tp[rats_clean$lc_tp =="Residential Property"] <-"Residential"
+rats_clean$lc_tp[rats_clean$lc_tp =="Residential Building"] <-"Residential"
+rats_clean$lc_tp[rats_clean$lc_tp =="Residential"] <-"Residential"
+rats_clean$lc_tp[rats_clean$lc_tp =="Residence"] <-"Residential"
+rats_clean$lc_tp[rats_clean$lc_tp =="Private House"] <-"Residential"
+rats_clean$lc_tp[rats_clean$lc_tp =="Retail Store"] <-"Store"
+rats_clean$lc_tp[rats_clean$lc_tp =="Grocery Store"] <-"Store"
+rats_clean$lc_tp[rats_clean$lc_tp =="Street Area"] <-"Public Space"
+rats_clean$lc_tp[rats_clean$lc_tp =="Ground"] <-"Public Space"
+rats_clean$lc_tp[rats_clean$lc_tp =="Office Building"] <-"Working Area"
+rats_clean$lc_tp[rats_clean$lc_tp =="Government Building"] <-"Working Area"
+rats_clean$lc_tp[rats_clean$lc_tp =="Hospital"] <-"Health Care"
+rats_clean$lc_tp[rats_clean$lc_tp =="Day Care/Nursery"] <-"Health Care"
+names(rats_clean)
+```
+
+## 1. Text of the question copied here
+
+## the plot is to show the total rats reported in the five borough,the Brooklyn is the most ,because it already be a circle, and then is Manhattan,is almost 75%.Form this we decide to make a more detail plot use the city of Brooklyn and Man
+
+```{r plot1, echo=FALSE}
+ggplot(rats_clean, aes(x=borough)) + geom_bar(aes(color = borough,fill=borough),width = 0.5)+ coord_polar("y", start=0)
+```
+## it  is a detail plot to shoe the rats reported in this five Borough over this 10 years
+```{r plot1 part2, height=12,fig.width=12,echo=FALSE}
+  ggplot(rats_clean, aes(y=borough,x=sighting_year)) + geom_col(aes(color = borough,fill=borough),width = 0.5)+facet_wrap(~sighting_year,ncol = 3,nrow = 5)
+```
+
+## a plot to shoe each year the rats
+```{r part6, echo=FALSE}
+ggplot(rats_clean, aes(x=borough,y=sighting_month))+ 
+  geom_col(aes(color=borough,fill=borough))+
+  labs(x="Month",y="Statue Data",title="Date of find rats in Borough")+
+  facet_wrap(~sighting_year,ncol = 3,nrow = 5)+
+  scale_x_discrete(guide=guide_axis(n.dodge=3))
+```
+
+## from above data we know the Broolyn and Manhattan have the most rats reported,so we will generate the rats report form these two Borough
+```{r datafilter}
+rats_bro <- rats_clean%>%
+  filter(borough == "BROOKLYN")
+rats_man <- rats_clean%>%
+  filter(borough == "MANHATTAN")
+  
+```
+
+### a. Subquestion text here
+## this is a plot to show the rats reported in years and to see which months have the most rats reported over 10 years.From this plot ,we can clearly see there are two months have the most rats sighted reported ,It is Julu and August
+```{r q2,fig.height=12,fig.width=12, echo=FALSE}
+ggplot(rats_clean, aes(x=sighting_month))+
+  coord_flip()+ 
+  geom_bar()+
+  facet_wrap(~sighting_year,ncol = 3,nrow = 5)
+```
+## from above data,we decide to use  July and August as the importan sample of observe,so we will filter the data by this two months
+```{r datafilter2}
+rats_bro_month <- rats_clean%>%
+  filter(sighting_month %in%  (7:8))
+rats_man_month <- rats_clean%>%
+  filter(sighting_month %in%  (7:8))
+```
+
+
+
+## Then we make this boxplot to see which years are the concentrated period of we received rats reported
+```{r part3, echo=FALSE}
+ggplot(rats_clean, aes(x=borough,y=created_date))+geom_boxplot(aes(color=borough))+labs(x="Borough",y="Find Date",title="Date of find rats in Borough")
+```
+## Then we have our final data ,it is data from Brooklyn and Manhattan,where are the most rats sighted reported and July and August when are the month have the most rats and in these years,so this is all we need about the filted condition about the data
+```{r filter2}
+rats_bro_final <- rats_bro_month %>% filter(sighting_year %in% (2013:2019) )
+rats_man_final <- rats_man_month %>% filter(sighting_year %in% (2013:2019) )
+```
+
+## then we want to see under these condtion  , in these most rats sighted reported months,years and borough,which kind of location type is most reported rats sighted
+```{r plot,fig.height=12,fig.width=12, echo=FALSE}
+ggplot(rats_bro_final)+geom_col(aes(y=lc_tp,x=sighting_year))+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+scale_fill_distiller(palette = "Blues")
+```
+
+
+```
